@@ -1,5 +1,14 @@
 {
-  "name": "figma-make-app",
+  "name": "telekocsi-carpool",
+  "description": "Ride-sharing web app connecting drivers and passengers",
+  "contributors": [
+    "Orsolya Meckl (https://github.com/omeckl)",
+    "Jozsef Kovesi (https://github.com/jkovesi)"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/omeckl/carpool.git"
+  },
   "private": true,
   "version": "1.0.0",
   "type": "module",
