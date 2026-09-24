@@ -28,3 +28,9 @@ React 19 · TypeScript · Vite · Tailwind CSS v4 · Supabase
 1. Create a `.env` file with `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`.
 2. `npm install`
 3. `npm run dev`
+
+## License
+
+No license — all rights reserved. © 2026 Orsolya Meckl and Jozsef Kovesi.
+The source code is published for viewing and reference only; it may not be
+copied, modified or redistributed without the authors' permission.
