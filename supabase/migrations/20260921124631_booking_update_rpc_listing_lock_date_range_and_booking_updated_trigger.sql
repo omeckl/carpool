@@ -206,7 +206,7 @@ begin
      and OLD.status = 'active' and NEW.status = 'active' then
     select decrypted_secret into v_secret from vault.decrypted_secrets where name = 'booking_webhook_secret';
     perform net.http_post(
-      url := 'https://yctezzkwrzncgsvzhbjk.supabase.co/functions/v1/notify-booking',
+      url := 'https://stohtxdwktjflxuqdxos.supabase.co/functions/v1/notify-booking',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'x-webhook-secret', v_secret

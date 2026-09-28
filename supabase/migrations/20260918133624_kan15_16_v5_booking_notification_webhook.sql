@@ -9,7 +9,7 @@ as $function$
 begin
   if NEW.status = 'active' then
     perform net.http_post(
-      url := 'https://yctezzkwrzncgsvzhbjk.supabase.co/functions/v1/notify-booking',
+      url := 'https://stohtxdwktjflxuqdxos.supabase.co/functions/v1/notify-booking',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
         'x-webhook-secret', 'L__PxaLiEnn32btmbVvC5e_28Wn88BilkZS5bH5oyx0'
