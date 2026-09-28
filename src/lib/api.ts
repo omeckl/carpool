@@ -146,17 +146,32 @@ export async function signUp(params: {
 }
 
 // Bejelentkezés felhasználónévvel VAGY e-mail címmel.
+// Felhasználónév esetén a feloldás és a bejelentkezés szerver oldalon, a
+// sign-in-with-username Edge Function-ben történik, így a felhasználónévhez
+// tartozó e-mail-cím soha nem jut el a böngészőbe.
 export async function signInWithIdentifier(identifier: string, password: string) {
-  let email = identifier;
-  if (!identifier.includes("@")) {
-    const { data: resolvedEmail, error: lookupError } = await supabase.rpc("email_for_username", {
-      p_username: identifier,
-    });
-    if (lookupError) throw new Error(lookupError.message);
-    if (!resolvedEmail) throw new Error("Nincs ilyen felhasználónévvel regisztrált fiók.");
-    email = resolvedEmail as string;
+  if (identifier.includes("@")) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email: identifier, password });
+    if (error) throw new Error("Hibás felhasználónév/e-mail vagy jelszó.");
+    return data;
   }
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  const { data: tokens, error: fnError } = await supabase.functions.invoke("sign-in-with-username", {
+    body: { username: identifier, password },
+  });
+  if (fnError) {
+    let message = "Hibás felhasználónév/e-mail vagy jelszó.";
+    const ctx = (fnError as { context?: Response }).context;
+    if (ctx && typeof ctx.json === "function") {
+      const payload = await ctx.json().catch(() => null);
+      if (payload?.error) message = payload.error;
+    }
+    throw new Error(message);
+  }
+  const { data, error } = await supabase.auth.setSession({
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+  });
   if (error) throw new Error("Hibás felhasználónév/e-mail vagy jelszó.");
   return data;
 }
