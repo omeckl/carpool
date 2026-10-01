@@ -11,7 +11,9 @@ export type Page =
   | "my-listings"
   | "my-bookings"
   | "edit-listing"
-  | "my-passengers";
+  | "my-passengers"
+  | "forgot-password"
+  | "reset-password";
 
 // Kontextusérzékeny "Vissza" gombok felirata: az adott oldalra mutató felirat,
 // amit akkor jelenítünk meg, amikor egy másik oldalról ide navigáltunk vissza.
@@ -29,6 +31,27 @@ export const PAGE_LABELS: Record<Page, string> = {
   "my-bookings": "Vissza a foglalásaimhoz",
   "edit-listing": "Vissza a hirdetés szerkesztéséhez",
   "my-passengers": "Vissza az utasaimhoz",
+  "forgot-password": "Vissza",
+  "reset-password": "Vissza",
+};
+
+// A böngészőfül címe oldalanként (CAR-61).
+export const PAGE_TITLES: Record<Page, string> = {
+  home: "Telekocsi",
+  login: "Bejelentkezés · Telekocsi",
+  register: "Regisztráció · Telekocsi",
+  "email-confirm": "E-mail megerősítés · Telekocsi",
+  "ride-detail": "Hirdetés · Telekocsi",
+  "create-listing": "Hirdetés feladása · Telekocsi",
+  profile: "Profilom · Telekocsi",
+  "change-password": "Jelszó módosítása · Telekocsi",
+  vehicles: "Járműveim · Telekocsi",
+  "my-listings": "Hirdetéseim · Telekocsi",
+  "my-bookings": "Foglalásaim · Telekocsi",
+  "edit-listing": "Hirdetés szerkesztése · Telekocsi",
+  "my-passengers": "Utasaim · Telekocsi",
+  "forgot-password": "Elfelejtett jelszó · Telekocsi",
+  "reset-password": "Új jelszó · Telekocsi",
 };
 
 export interface AppState {

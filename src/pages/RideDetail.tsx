@@ -9,9 +9,10 @@ interface RideDetailProps {
   isLoggedIn: boolean;
   rideId: string | null;
   currentUserId: string | null;
+  openPassengers?: (listingId: string) => void;
 }
 
-export default function RideDetail({ navigate, goBack, isLoggedIn, rideId, currentUserId }: RideDetailProps) {
+export default function RideDetail({ navigate, goBack, isLoggedIn, rideId, currentUserId, openPassengers }: RideDetailProps) {
   const [ride, setRide] = useState<RideDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [seats, setSeats] = useState(1);
@@ -154,7 +155,22 @@ export default function RideDetail({ navigate, goBack, isLoggedIn, rideId, curre
                 {ride.driver_full_name ? (
                   <div className="mt-1 text-xs text-[#717171]">@{ride.driver_username}</div>
                 ) : (
-                  <div className="mt-1 text-xs text-[#717171]">🔒 Teljes név és telefonszám foglalás után látható</div>
+                  <div className="mt-1 text-xs text-[#717171]">🔒 Teljes név és elérhetőség foglalás után látható</div>
+                )}
+                {/* CAR-56: aktív foglalás esetén a sofőr elérhetősége itt is látszik */}
+                {(ride.driver_phone || ride.driver_email) && (
+                  <div className="mt-2 space-y-0.5 text-sm">
+                    {ride.driver_phone && (
+                      <div>
+                        📞 <a href={`tel:${ride.driver_phone.replace(/[^0-9+]/g, "")}`} className="font-semibold text-[#222222] hover:underline">{ride.driver_phone}</a>
+                      </div>
+                    )}
+                    {ride.driver_email && (
+                      <div>
+                        ✉️ <a href={`mailto:${ride.driver_email}`} className="font-semibold text-[#222222] hover:underline break-all">{ride.driver_email}</a>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -169,6 +185,15 @@ export default function RideDetail({ navigate, goBack, isLoggedIn, rideId, curre
                 <div className="text-sm text-[#717171]">
                   Ez a saját hirdetésed, foglalást nem tudsz rá leadni. Itt csak megtekintheted.
                 </div>
+                {/* CAR-55: Utasaim link a saját, foglalással rendelkező hirdetésen */}
+                {openPassengers && ride.seats_booked > 0 && (
+                  <button
+                    onClick={() => openPassengers(ride.id)}
+                    className="mt-4 w-full border border-[#FF385C] text-[#FF385C] hover:bg-[#FFF0F2] font-bold py-3 rounded-xl text-sm transition-colors"
+                  >
+                    Utasaim ({ride.seats_booked} foglalt hely)
+                  </button>
+                )}
               </div>
             </div>
           </div>

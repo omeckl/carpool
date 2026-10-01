@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Page } from "../types";
 import { getMyProfile, updateMyProfile } from "../lib/api";
 import { supabase } from "../lib/supabase";
+import { validateFullName, validatePhone, validateUsername } from "../lib/validation";
 
 interface ProfileProps {
   navigate: (page: Page) => void;
@@ -43,6 +44,11 @@ export default function Profile({ navigate }: ProfileProps) {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const validationError = validateFullName(form.name) ?? validateUsername(form.username) ?? validatePhone(form.phone);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setSaving(true);
     try {
       await updateMyProfile({ full_name: form.name, username: form.username, phone: form.phone });

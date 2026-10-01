@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Page } from "../types";
 import { changePassword } from "../lib/api";
+import { PASSWORD_RULE, friendlyAuthError, validatePassword } from "../lib/validation";
 
 interface ChangePasswordProps {
   navigate: (page: Page) => void;
@@ -23,8 +24,9 @@ export default function ChangePassword({ goBack, backLabel }: ChangePasswordProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.next.length < 8) {
-      setError("Az új jelszónak legalább 8 karakter hosszúnak kell lennie.");
+    const pwError = validatePassword(form.next);
+    if (pwError) {
+      setError(pwError);
       return;
     }
     if (form.next !== form.confirm) {
@@ -40,7 +42,8 @@ export default function ChangePassword({ goBack, backLabel }: ChangePasswordProp
       await changePassword(form.current, form.next);
       setDone(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Hiba történt a jelszó módosítása során.");
+      const msg = err instanceof Error ? err.message : "";
+      setError(/[áéíóöőúüű]/i.test(msg) ? msg : friendlyAuthError(msg));
     } finally {
       setSubmitting(false);
     }
@@ -134,6 +137,7 @@ export default function ChangePassword({ goBack, backLabel }: ChangePasswordProp
                 )}
               </button>
             </div>
+            <p className="text-xs text-[#717171] mt-1">{PASSWORD_RULE}</p>
           </div>
 
           <div>

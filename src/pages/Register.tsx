@@ -1,22 +1,20 @@
 import { useState } from "react";
 import { Page } from "../types";
 import { signUp } from "../lib/api";
+import {
+  PASSWORD_RULE,
+  USERNAME_RULE,
+  friendlyAuthError,
+  validateFullName,
+  validatePassword,
+  validatePhone,
+  validateUsername,
+} from "../lib/validation";
 
 interface RegisterProps {
   navigate: (page: Page) => void;
   goBack: () => void;
   onRegistered: (email: string) => void;
-}
-
-function friendlySignupError(message: string): string {
-  const m = message.toLowerCase();
-  if (m.includes("username") && (m.includes("duplicate") || m.includes("unique"))) {
-    return "Ez a felhasználónév már foglalt.";
-  }
-  if (m.includes("already registered") || (m.includes("email") && m.includes("exists"))) {
-    return "Ezzel az e-mail címmel már létezik fiók.";
-  }
-  return message;
 }
 
 export default function Register({ navigate, onRegistered }: RegisterProps) {
@@ -38,6 +36,16 @@ export default function Register({ navigate, onRegistered }: RegisterProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    // CAR-49 / CAR-62: kliensoldali ellenőrzés (a szerver ugyanezt kikényszeríti).
+    const validationError =
+      validateFullName(form.name) ??
+      validateUsername(form.username) ??
+      validatePhone(form.phone) ??
+      validatePassword(form.password);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setLoading(true);
     try {
       await signUp({
@@ -47,10 +55,12 @@ export default function Register({ navigate, onRegistered }: RegisterProps) {
         fullName: form.name,
         phone: form.phone,
       });
-      onRegistered(form.email);
+      onRegistered(form.email.trim());
       navigate("email-confirm");
     } catch (err) {
-      setError(friendlySignupError(err instanceof Error ? err.message : "Hiba történt a regisztráció során."));
+      const msg = err instanceof Error ? err.message : "";
+      // A signUp() már magyar üzenetet dob; ami mégis angolul jön, azt magyarítjuk.
+      setError(/[áéíóöőúüű]/i.test(msg) ? msg : friendlyAuthError(msg));
     } finally {
       setLoading(false);
     }
@@ -90,8 +100,12 @@ export default function Register({ navigate, onRegistered }: RegisterProps) {
               onChange={(e) => set("username", e.target.value)}
               placeholder="kovacs.peter"
               required
+              autoComplete="username"
               className="w-full border border-[#DDDDDD] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#222222] transition-colors"
             />
+            <p className="text-xs text-[#717171] mt-1">
+              A felhasználóneved nyilvánosan megjelenik a hirdetéseidnél. {USERNAME_RULE}
+            </p>
           </div>
 
           <div>
@@ -129,6 +143,7 @@ export default function Register({ navigate, onRegistered }: RegisterProps) {
                 placeholder="Legalább 8 karakter"
                 required
                 minLength={8}
+                autoComplete="new-password"
                 className="w-full border border-[#DDDDDD] rounded-xl px-4 py-3 pr-12 text-sm focus:outline-none focus:border-[#222222] transition-colors"
               />
               <button
@@ -143,6 +158,7 @@ export default function Register({ navigate, onRegistered }: RegisterProps) {
                 )}
               </button>
             </div>
+            <p className="text-xs text-[#717171] mt-1">{PASSWORD_RULE}</p>
           </div>
 
           <label className="flex items-start gap-3 cursor-pointer group">

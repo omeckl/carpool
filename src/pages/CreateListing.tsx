@@ -38,14 +38,11 @@ export default function CreateListing({ navigate, goBack, backLabel }: CreateLis
   const set = (k: string, v: string) => {
     setForm((f) => {
       const next = { ...f, [k]: v };
-      // Ha a jármű váltás miatt a korábban beírt szabad helyek száma már
-      // meghaladná az új jármű férőhelyét, korrigáljuk (KAN-14).
+      // CAR-53: jármű kiválasztásakor/váltásakor a szabad helyek mezőt a
+      // jármű férőhelyére állítjuk (a felhasználó ezt utána csökkentheti).
       if (k === "vehicle") {
         const newVehicle = vehicles.find((veh) => veh.id === v);
-        const newMax = newVehicle?.seats ?? 8;
-        if (next.seats && parseInt(next.seats, 10) > newMax) {
-          next.seats = String(newMax);
-        }
+        next.seats = newVehicle ? String(newVehicle.seats) : "";
       }
       return next;
     });
@@ -58,8 +55,8 @@ export default function CreateListing({ navigate, goBack, backLabel }: CreateLis
     try {
       await createListing({
         vehicleId: form.vehicle,
-        from: form.from,
-        to: form.to,
+        from: form.from.trim(),
+        to: form.to.trim(),
         date: form.date,
         time: form.time,
         price: parseInt(form.price, 10),

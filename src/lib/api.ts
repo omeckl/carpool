@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { friendlyAuthError, normalizeSearch } from "./validation";
 
 // ============================================================
 // Típusok — a Supabase séma (profiles / vehicles / ride_details /
@@ -41,6 +42,9 @@ export interface RideDetails {
   seats_booked: number;
   seats_available: number;
   created_at: string;
+  // Csak aktív foglalással rendelkező utasnak töltődik ki (CAR-56).
+  driver_phone?: string | null;
+  driver_email?: string | null;
   // Az indulás pontos időpontja (ride_date + ride_time), a szerveren
   // Europe/Budapest időzóna szerint (nyári/téli időszámítást is helyesen
   // kezelve) UTC időbélyeggé alakítva — erre kell szűrni/hasonlítani, nem a
@@ -115,7 +119,15 @@ export interface MyBooking {
 
 function friendlyError(error: { message: string } | null): never | void {
   if (!error) return;
-  throw new Error(error.message);
+  const m = error.message;
+  if (m.includes("vehicles_plate_format")) {
+    throw new Error("A rendszám legfeljebb 10 karakter lehet, és csak betűt, számot, szóközt vagy kötőjelet tartalmazhat (ékezet nélkül).");
+  }
+  if (m.includes("vehicles_type_len")) throw new Error("A jármű típusa legalább 2 karakter legyen.");
+  if (m.includes("violates check constraint") || m.includes("duplicate key")) {
+    throw new Error("Érvénytelen adat. Ellenőrizd a megadott mezőket.");
+  }
+  throw new Error(m);
 }
 
 // ============================================================
@@ -129,7 +141,18 @@ export async function signUp(params: {
   fullName: string;
   phone: string;
 }) {
-  const { email, password, username, fullName, phone } = params;
+  const email = params.email.trim();
+  const { password } = params;
+  const username = params.username.trim();
+  const fullName = params.fullName.trim();
+  const phone = params.phone.trim();
+
+  // CAR-48: foglalt felhasználónév (kis/nagybetűtől függetlenül) — olvasható
+  // hibaüzenet a regisztráció elküldése előtt.
+  const { data: available, error: availError } = await supabase.rpc("username_available", { p_username: username });
+  if (availError) throw new Error("Váratlan hiba történt. Kérjük, próbáld újra később.");
+  if (available === false) throw new Error("Ez a felhasználónév már foglalt.");
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -141,15 +164,49 @@ export async function signUp(params: {
       emailRedirectTo: window.location.origin,
     },
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(friendlyAuthError(error.message));
+  // CAR-44: már regisztrált e-mail címnél a Supabase (felhasználó-felderítés
+  // elleni védelemként) nem ad hibát, csak üres identities listát ad vissza.
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    throw new Error("Ezzel az e-mail címmel már létezik fiók. Jelentkezz be.");
+  }
   return data;
+}
+
+// CAR-58: elfelejtett jelszó — a válasz szándékosan semleges, nem árulja el,
+// létezik-e fiók az adott címmel.
+export async function requestPasswordReset(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: window.location.origin,
+  });
+  if (error) {
+    const m = error.message.toLowerCase();
+    if (m.includes("rate limit") || m.includes("security purposes") || m.includes("too many")) {
+      throw new Error(friendlyAuthError(error.message));
+    }
+  }
+}
+
+// CAR-58: új jelszó beállítása a helyreállító linkről érkezve (a munkamenetet
+// az App.tsx állítja be a link tokenjeiből), majd kijelentkeztetés.
+export async function setNewPassword(password: string) {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new Error(friendlyAuthError(error.message));
+  await supabase.auth.signOut().catch(() => {});
+}
+
+export async function usernameAvailable(username: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("username_available", { p_username: username.trim() });
+  if (error) throw new Error("Váratlan hiba történt. Kérjük, próbáld újra később.");
+  return data !== false;
 }
 
 // Bejelentkezés felhasználónévvel VAGY e-mail címmel.
 // Felhasználónév esetén a feloldás és a bejelentkezés szerver oldalon, a
 // sign-in-with-username Edge Function-ben történik, így a felhasználónévhez
 // tartozó e-mail-cím soha nem jut el a böngészőbe.
-export async function signInWithIdentifier(identifier: string, password: string) {
+export async function signInWithIdentifier(rawIdentifier: string, password: string) {
+  const identifier = rawIdentifier.trim();
   if (identifier.includes("@")) {
     const { data, error } = await supabase.auth.signInWithPassword({ email: identifier, password });
     if (error) throw new Error("Hibás felhasználónév/e-mail vagy jelszó.");
@@ -205,8 +262,17 @@ export async function getMyProfile(): Promise<Profile | null> {
 export async function updateMyProfile(patch: { full_name?: string; username?: string; phone?: string }) {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData.user) throw new Error("Nincs bejelentkezve.");
-  const { error } = await supabase.from("profiles").update(patch).eq("id", userData.user.id);
-  friendlyError(error);
+  const trimmed = Object.fromEntries(
+    Object.entries(patch).map(([k, v]) => [k, typeof v === "string" ? v.trim() : v]),
+  );
+  if (trimmed.username) {
+    const { data: own } = await supabase.from("profiles").select("username").eq("id", userData.user.id).single();
+    if (!own || own.username.toLowerCase() !== String(trimmed.username).toLowerCase()) {
+      if (!(await usernameAvailable(String(trimmed.username)))) throw new Error("Ez a felhasználónév már foglalt.");
+    }
+  }
+  const { error } = await supabase.from("profiles").update(trimmed).eq("id", userData.user.id);
+  if (error) throw new Error(friendlyAuthError(error.message));
 }
 
 export async function changePassword(currentPassword: string, newPassword: string) {
@@ -240,10 +306,10 @@ export async function addVehicle(v: { type: string; plate: string; seats: number
   if (!userData.user) throw new Error("Nincs bejelentkezve.");
   const { error } = await supabase.from("vehicles").insert({
     owner_id: userData.user.id,
-    type: v.type,
-    plate: v.plate,
+    type: v.type.trim(),
+    plate: v.plate.trim().toUpperCase(),
     seats: v.seats,
-    color: v.color || null,
+    color: v.color?.trim() || null,
   });
   friendlyError(error);
 }
@@ -258,10 +324,10 @@ export async function removeVehicle(id: string) {
 export async function updateVehicle(v: { id: string; type: string; plate: string; seats: number; color?: string }) {
   const { error } = await supabase.rpc("update_vehicle", {
     p_vehicle_id: v.id,
-    p_type: v.type,
-    p_plate: v.plate,
+    p_type: v.type.trim(),
+    p_plate: v.plate.trim().toUpperCase(),
     p_seats: v.seats,
-    p_color: v.color || null,
+    p_color: v.color?.trim() || null,
   });
   friendlyError(error);
 }
@@ -279,7 +345,10 @@ export async function getVehicleById(id: string): Promise<Vehicle | null> {
 export async function listAvailableRides(filters: {
   from?: string;
   to?: string;
-  date?: string;
+  // CAR-46: "-tól" / "-ig" (YYYY-MM-DD, budapesti naptári nap, mindkét vég
+  // zárt: -tól 0:00-tól, -ig 23:59:59-ig). Az elindult utak mindig rejtve.
+  dateFrom?: string;
+  dateTo?: string;
   minSeats?: number;
 }): Promise<RideDetails[]> {
   let query = supabase
@@ -293,9 +362,14 @@ export async function listAvailableRides(filters: {
     .gte("departs_at", new Date().toISOString())
     .order("ride_date", { ascending: true });
 
-  if (filters.from) query = query.ilike("from_city", `%${filters.from}%`);
-  if (filters.to) query = query.ilike("to_city", `%${filters.to}%`);
-  if (filters.date) query = query.eq("ride_date", filters.date);
+  // CAR-54: szóközvágás + ékezet- és kisbetű-független keresés a
+  // normalizált oszlopokon. A % és _ joker karaktereket kiszűrjük.
+  const from = filters.from ? normalizeSearch(filters.from).replace(/[%_]/g, "") : "";
+  const to = filters.to ? normalizeSearch(filters.to).replace(/[%_]/g, "") : "";
+  if (from) query = query.ilike("from_city_norm", `%${from}%`);
+  if (to) query = query.ilike("to_city_norm", `%${to}%`);
+  if (filters.dateFrom) query = query.gte("ride_date", filters.dateFrom);
+  if (filters.dateTo) query = query.lte("ride_date", filters.dateTo);
   if (filters.minSeats) query = query.gte("seats_available", filters.minSeats);
 
   const { data, error } = await query;

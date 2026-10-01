@@ -26,7 +26,7 @@ export default function RidePhoto({ destination, photoUrl, photoStatus, classNam
     return (
       <img
         src={photoUrl!}
-        alt=""
+        alt={destination}
         loading="lazy"
         className={className}
         onError={() => {
@@ -46,5 +46,5 @@ export default function RidePhoto({ destination, photoUrl, photoStatus, classNam
   // Folyamatban / Hibás / még nincs cache-sor / törött link — statikus
   // tartalékkép, hálózati függőség nélkül, hogy soha ne maradjon törött
   // vagy hiányzó kép a felületen.
-  return <img src={placeholder} alt="" className={className} />;
+  return <img src={placeholder} alt={destination} className={className} />;
 }

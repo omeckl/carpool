@@ -26,14 +26,26 @@ export default function MyPassengers({ goBack, backLabel, listingId }: MyPasseng
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    // CAR-55: előbb betöltjük a listát (benne az "Új" jelöléssel), és csak
+    // utána jelöljük megtekintettnek — különben a párhuzamos hívás miatt az
+    // "Új" címke soha nem jelenne meg. A címke a következő megnyitáskor tűnik el.
     listMyPassengers(listingId ?? undefined)
-      .then(setPassengers)
-      .catch((err) => setError(err instanceof Error ? err.message : "Hiba történt az utasok betöltése során."))
-      .finally(() => setLoading(false));
-    // Megnyitáskor jelöljük megtekintettnek — a "friss" jelölés eltűnik, a navbar
-    // jelvény pedig a következő navigáláskor frissül.
-    markPassengersViewed().catch(() => {});
+      .then((rows) => {
+        if (cancelled) return;
+        setPassengers(rows);
+        markPassengersViewed().catch(() => {});
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Hiba történt az utasok betöltése során.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [listingId]);
 
   const active = passengers.filter((p) => p.display_status === "active").sort(compareActive);
@@ -112,9 +124,9 @@ export default function MyPassengers({ goBack, backLabel, listingId }: MyPasseng
                             {p.passenger_email && (
                               <div className="text-xs text-[#717171]">{p.passenger_email}</div>
                             )}
-                            {!listingId && (
-                              <div className="text-sm text-[#717171] mt-1">{p.from_city} → {p.to_city} · {p.ride_date} · {p.ride_time?.slice(0, 5)}</div>
-                            )}
+                            <div className="text-sm text-[#717171] mt-1">
+                              {!listingId ? `${p.from_city} → ${p.to_city} · ` : ""}{p.ride_date} · {p.ride_time?.slice(0, 5)}
+                            </div>
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -146,7 +158,11 @@ export default function MyPassengers({ goBack, backLabel, listingId }: MyPasseng
                           <div className="text-sm text-[#717171] mt-1">
                             {p.seats_booked} hely{!listingId ? ` · ${p.from_city} → ${p.to_city}` : ""} · {p.ride_date} · {p.ride_time?.slice(0, 5)}
                           </div>
-                          {p.passenger_email && <div className="text-xs text-[#717171] mt-0.5">{p.passenger_email}</div>}
+                          {(p.passenger_phone || p.passenger_email) && (
+                            <div className="text-xs text-[#717171] mt-0.5">
+                              {[p.passenger_phone, p.passenger_email].filter(Boolean).join(" · ")}
+                            </div>
+                          )}
                         </div>
                         <span className="text-xs font-semibold bg-[#F0F0F0] text-[#717171] px-3 py-1 rounded-full whitespace-nowrap">
                           {STATUS_LABEL[p.display_status]}

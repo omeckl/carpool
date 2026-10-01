@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Page } from "../types";
 import { Vehicle, addVehicle, listMyVehicles, removeVehicle, updateVehicle } from "../lib/api";
+import { validateVehicle } from "../lib/validation";
 import ConfirmDialog from "../components/ConfirmDialog";
 
 interface VehiclesProps {
@@ -24,6 +25,7 @@ export default function Vehicles({ goBack, backLabel }: VehiclesProps) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<VehicleFormState>(emptyForm);
   const [error, setError] = useState("");
+  const [removeError, setRemoveError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -48,6 +50,11 @@ export default function Vehicles({ goBack, backLabel }: VehiclesProps) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const validationError = validateVehicle(form);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setSubmitting(true);
     try {
       await addVehicle({ type: form.type, plate: form.plate, seats: parseInt(form.seats, 10), color: form.color });
@@ -65,11 +72,15 @@ export default function Vehicles({ goBack, backLabel }: VehiclesProps) {
 
   const confirmRemove = async () => {
     if (!confirmRemoveId) return;
+    setRemoveError("");
     setRemoving(true);
     try {
       await removeVehicle(confirmRemoveId);
       setConfirmRemoveId(null);
       refresh();
+    } catch (err) {
+      setConfirmRemoveId(null);
+      setRemoveError(err instanceof Error ? err.message : "Hiba történt a jármű törlése során.");
     } finally {
       setRemoving(false);
     }
@@ -92,6 +103,11 @@ export default function Vehicles({ goBack, backLabel }: VehiclesProps) {
   const submitEdit = async (e: React.FormEvent, id: string) => {
     e.preventDefault();
     setEditError("");
+    const validationError = validateVehicle(editForm);
+    if (validationError) {
+      setEditError(validationError);
+      return;
+    }
     setEditSubmitting(true);
     try {
       await updateVehicle({
@@ -137,6 +153,12 @@ export default function Vehicles({ goBack, backLabel }: VehiclesProps) {
           </button>
         </div>
 
+        {removeError && (
+          <div className="mb-5 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            <span className="text-sm text-red-700 font-medium">{removeError}</span>
+          </div>
+        )}
+
         {/* Add form */}
         {showForm && (
           <div className="bg-white rounded-2xl border border-[#DDDDDD] p-6 mb-5">
@@ -171,7 +193,8 @@ export default function Vehicles({ goBack, backLabel }: VehiclesProps) {
                   <label className="block text-sm font-semibold text-[#222222] mb-1.5">Rendszám</label>
                   <input
                     value={form.plate}
-                    onChange={(e) => set("plate", e.target.value)}
+                    onChange={(e) => set("plate", e.target.value.toUpperCase())}
+                    maxLength={10}
                     placeholder="ABC-123"
                     required
                     className="w-full border border-[#DDDDDD] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#222222] transition-colors uppercase"
@@ -252,7 +275,8 @@ export default function Vehicles({ goBack, backLabel }: VehiclesProps) {
                         <label className="block text-sm font-semibold text-[#222222] mb-1.5">Rendszám</label>
                         <input
                           value={editForm.plate}
-                          onChange={(e) => setEdit("plate", e.target.value)}
+                          onChange={(e) => setEdit("plate", e.target.value.toUpperCase())}
+                          maxLength={10}
                           required
                           className="w-full border border-[#DDDDDD] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#222222] transition-colors uppercase"
                         />

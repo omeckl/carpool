@@ -7,9 +7,11 @@ interface LoginProps {
   goBack: () => void;
   notice?: { type: "success" | "error"; message: string } | null;
   clearNotice?: () => void;
+  // Sikeres bejelentkezés után hova menjen (CAR-61: vissza a kért oldalra).
+  onSuccess?: () => void;
 }
 
-export default function Login({ navigate, notice, clearNotice }: LoginProps) {
+export default function Login({ navigate, notice, clearNotice, onSuccess }: LoginProps) {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -23,7 +25,8 @@ export default function Login({ navigate, notice, clearNotice }: LoginProps) {
     try {
       await signInWithIdentifier(identifier, password);
       clearNotice?.();
-      navigate("home");
+      if (onSuccess) onSuccess();
+      else navigate("home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Hiba történt a bejelentkezés során.");
     } finally {
@@ -73,6 +76,7 @@ export default function Login({ navigate, notice, clearNotice }: LoginProps) {
               onChange={(e) => setIdentifier(e.target.value)}
               placeholder="kovacs.peter vagy peter@email.hu"
               required
+              autoComplete="username"
               className="w-full border border-[#DDDDDD] rounded-xl px-4 py-3 text-[#222222] text-sm focus:outline-none focus:border-[#222222] transition-colors"
             />
           </div>
@@ -88,6 +92,7 @@ export default function Login({ navigate, notice, clearNotice }: LoginProps) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
                 className="w-full border border-[#DDDDDD] rounded-xl px-4 py-3 pr-12 text-[#222222] text-sm focus:outline-none focus:border-[#222222] transition-colors"
               />
               <button
@@ -102,6 +107,16 @@ export default function Login({ navigate, notice, clearNotice }: LoginProps) {
                 )}
               </button>
             </div>
+          </div>
+
+          <div className="text-right -mt-1">
+            <button
+              type="button"
+              onClick={() => navigate("forgot-password")}
+              className="text-sm font-semibold text-[#FF385C] hover:underline"
+            >
+              Elfelejtett jelszó?
+            </button>
           </div>
 
           {error && (

@@ -185,9 +185,19 @@ export default function MyListings({ navigate, selectListingToEdit, selectListin
                             <div className="text-sm text-[#717171] mt-1">{l.ride_date} · {l.ride_time?.slice(0, 5)}</div>
                             <div className="text-sm text-[#717171] mt-1">
                               {l.price_huf.toLocaleString()} Ft / fő
-                              {category === "expired" ? ` · ${l.seats_booked} foglalás volt` : ""}
-                              {category === "cancelled" ? ` · ${l.cancelled_seats_snapshot ?? 0} foglalás volt` : ""}
+                              {/* CAR-59: a szám helyfoglalást jelent, nem foglalásszámot */}
+                              {category === "expired" ? ` · ${l.seats_booked} hely volt foglalva` : ""}
+                              {category === "cancelled" ? ` · ${l.cancelled_seats_snapshot ?? 0} hely volt foglalva` : ""}
                             </div>
+                            {((category === "expired" && l.seats_booked > 0) ||
+                              (category === "cancelled" && (l.cancelled_seats_snapshot ?? 0) > 0)) && (
+                              <button
+                                onClick={() => selectListingToPassengers(l.id)}
+                                className="text-xs font-semibold text-[#FF385C] mt-2 hover:underline"
+                              >
+                                Utasaim megtekintése →
+                              </button>
+                            )}
                           </div>
                           <span className="text-xs font-semibold bg-[#F0F0F0] text-[#717171] px-3 py-1 rounded-full whitespace-nowrap">
                             {CATEGORY_LABEL[category]}
